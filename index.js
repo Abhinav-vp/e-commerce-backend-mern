@@ -5,6 +5,8 @@ const cors = require("cors");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const cloudinary = require("cloudinary").v2;
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
 
 const app = express();
 const port = process.env.PORT || 4000;
@@ -13,22 +15,28 @@ const port = process.env.PORT || 4000;
 app.use(express.json());
 app.use(cors());
 
-// Ensure upload directory exists
+// Ensure upload directory exists for local seeding
 const uploadDir = path.join(__dirname, "upload", "images");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// Serve uploaded images statically
+// Serve locally uploaded or seeded images statically
 app.use("/images", express.static(uploadDir));
 
-// Image upload with Multer
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}${path.extname(file.originalname)}`);
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// Image upload with Multer to Cloudinary
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: "ecommerce_products",
+    allowedFormats: ["jpeg", "png", "jpg", "webp"],
   },
 });
 const upload = multer({ storage });
@@ -37,7 +45,7 @@ const upload = multer({ storage });
 app.post("/upload", upload.single("product"), (req, res) => {
   res.json({
     success: true,
-    image_url: `http://localhost:${port}/images/${req.file.filename}`,
+    image_url: req.file.path,
   });
 });
 
