@@ -371,6 +371,14 @@ async function seedDatabase() {
       new_price: 85.0,
       old_price: 120.5,
     },
+    {
+      id: 37,
+      name: "Striped Flutter Sleeve Overlap Collar Peplum Hem Blouse",
+      category: "women",
+      image: "product_38.jpeg",
+      new_price: 80.0,
+      old_price: 150.5,
+    },
   ];
 
   // Copy images from frontend assets
