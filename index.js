@@ -387,6 +387,14 @@ async function seedDatabase() {
       new_price: 60.0,
       old_price: 100.5,
     },
+    {
+      id: 39,
+      name: "Crop Top",
+      category: "women",
+      image: "product_37.webp",
+      new_price: 60.0,
+      old_price: 100.5,
+    },
   ];
 
   // Copy images from frontend assets
