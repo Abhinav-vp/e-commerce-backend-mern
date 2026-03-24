@@ -57,7 +57,20 @@ router.post("/login", async (req, res) => {
       });
     }
 
-    const isMatch = await bcrypt.compare(req.body.password, user.password);
+    let isMatch = false;
+    if (user.password.startsWith("$2b$") || user.password.startsWith("$2a$")) {
+      isMatch = await bcrypt.compare(req.body.password, user.password);
+    } else {
+      // Fallback for older users with plaintext passwords
+      if (user.password === req.body.password) {
+        isMatch = true;
+        // Migrate their password to bcrypt hash
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(req.body.password, salt);
+        await user.save();
+      }
+    }
+
     if (!isMatch) {
       return res.status(400).json({
         success: false,
