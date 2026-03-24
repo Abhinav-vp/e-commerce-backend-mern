@@ -391,7 +391,7 @@ async function seedDatabase() {
       id: 39,
       name: "Crop Top",
       category: "women",
-      image: "product_37.webp",
+      image: "product_39.webp",
       new_price: 60.0,
       old_price: 100.5,
     },
