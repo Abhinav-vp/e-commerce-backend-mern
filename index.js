@@ -31,21 +31,60 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Image upload with Multer to Cloudinary
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: {
-    folder: "ecommerce_products",
-    allowedFormats: ["jpeg", "png", "jpg", "webp"],
-  },
-});
+// Check for Cloudinary configuration
+const isCloudinaryConfigured =
+  process.env.CLOUDINARY_CLOUD_NAME &&
+  process.env.CLOUDINARY_CLOUD_NAME !== "your_cloud_name";
+
+let storage;
+
+if (isCloudinaryConfigured) {
+  storage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+      folder: "ecommerce_products",
+      allowedFormats: ["jpeg", "png", "jpg", "webp"],
+    },
+  });
+} else {
+  // Use local disk storage as fallback
+  storage = multer.diskStorage({
+    destination: uploadDir,
+    filename: (req, file, cb) => {
+      cb(null, `${file.fieldname}_${Date.now()}${path.extname(file.originalname)}`);
+    },
+  });
+}
+
 const upload = multer({ storage });
 
 // Image upload endpoint
 app.post("/upload", upload.single("product"), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ success: false, message: "No file uploaded" });
+  }
+
+  let imageUrl;
+  if (isCloudinaryConfigured) {
+    imageUrl = req.file.path;
+  } else {
+    const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get("host")}`;
+    imageUrl = `${baseUrl}/images/${req.file.filename}`;
+  }
+
   res.json({
     success: true,
-    image_url: req.file.path,
+    image_url: imageUrl,
+  });
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error("Unhandle Error:", err);
+  res.status(500).json({
+    success: false,
+    message: err.message || "Internal Server Error",
+    error: process.env.NODE_ENV === "development" ? err : {},
   });
 });
 
