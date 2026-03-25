@@ -4,7 +4,7 @@ const Product = require("../models/Product");
 const User = require("../models/User");
 const fetchUser = require("../middleware/auth");
 
-// Middleware to verify admin role
+
 const verifyAdmin = async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id);
@@ -19,9 +19,7 @@ const verifyAdmin = async (req, res, next) => {
   }
 };
 
-// ===== PRODUCT MANAGEMENT =====
 
-// GET all products (admin view with all details)
 router.get("/products", fetchUser, verifyAdmin, async (req, res) => {
   try {
     const products = await Product.find({});
@@ -31,19 +29,19 @@ router.get("/products", fetchUser, verifyAdmin, async (req, res) => {
   }
 });
 
-// ADD new product
+
 router.post("/products/add", fetchUser, verifyAdmin, async (req, res) => {
   try {
     const { id, name, category, image, new_price, old_price } = req.body;
 
-    // Validate required fields
+
     if (!id || !name || !category || !image || !new_price || !old_price) {
       return res
         .status(400)
         .json({ success: false, error: "All fields are required" });
     }
 
-    // Check if product already exists
+
     const existingProduct = await Product.findOne({ id });
     if (existingProduct) {
       return res
@@ -71,7 +69,7 @@ router.post("/products/add", fetchUser, verifyAdmin, async (req, res) => {
   }
 });
 
-// EDIT product
+
 router.put("/products/:id", fetchUser, verifyAdmin, async (req, res) => {
   try {
     const { name, category, image, new_price, old_price } = req.body;
@@ -100,7 +98,6 @@ router.put("/products/:id", fetchUser, verifyAdmin, async (req, res) => {
   }
 });
 
-// DELETE product
 router.delete("/products/:id", fetchUser, verifyAdmin, async (req, res) => {
   try {
     const product = await Product.findOneAndDelete({
@@ -119,9 +116,6 @@ router.delete("/products/:id", fetchUser, verifyAdmin, async (req, res) => {
   }
 });
 
-// ===== USER MANAGEMENT =====
-
-// GET all users
 router.get("/users", fetchUser, verifyAdmin, async (req, res) => {
   try {
     const users = await User.find({}).select("-password");
@@ -131,7 +125,7 @@ router.get("/users", fetchUser, verifyAdmin, async (req, res) => {
   }
 });
 
-// GET user by ID
+
 router.get("/users/:id", fetchUser, verifyAdmin, async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select("-password");
@@ -144,7 +138,6 @@ router.get("/users/:id", fetchUser, verifyAdmin, async (req, res) => {
   }
 });
 
-// UPDATE user role (make admin)
 router.put("/users/:id/role", fetchUser, verifyAdmin, async (req, res) => {
   try {
     const { isAdmin } = req.body;
@@ -164,7 +157,6 @@ router.put("/users/:id/role", fetchUser, verifyAdmin, async (req, res) => {
   }
 });
 
-// DELETE user
 router.delete("/users/:id", fetchUser, verifyAdmin, async (req, res) => {
   try {
     const user = await User.findByIdAndDelete(req.params.id);
@@ -179,12 +171,8 @@ router.delete("/users/:id", fetchUser, verifyAdmin, async (req, res) => {
   }
 });
 
-// ===== ORDER MANAGEMENT (MOCK) =====
-
-// GET all orders (mock data - in real app, need Order model)
 router.get("/orders", fetchUser, verifyAdmin, async (req, res) => {
   try {
-    // TODO: Replace with real Order model once implemented
     const orders = [
       {
         _id: "order_1",
@@ -213,11 +201,9 @@ router.get("/orders", fetchUser, verifyAdmin, async (req, res) => {
   }
 });
 
-// UPDATE order status
 router.put("/orders/:id", fetchUser, verifyAdmin, async (req, res) => {
   try {
     const { status } = req.body;
-    // TODO: Update with real Order model
     res.json({ success: true, message: "Order status updated", status });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
