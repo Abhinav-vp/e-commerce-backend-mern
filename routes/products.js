@@ -1,6 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const Product = require("../models/Product");
+const fs = require("fs");
+const path = require("path");
 
 router.get("/", async (req, res) => {
   try {
@@ -47,9 +49,49 @@ const isCloudinaryConfigured =
 
 // --- Helper must be at the top ---
 const createThumbnailUrl = (url) => {
-  if (!url || !url.includes('res.cloudinary.com')) return url;
-  const parts = url.split('/upload/');
-  return `${parts[0]}/upload/w_300,q_60,f_auto/${parts[1]}`;
+  if (!url) return url;
+  
+  // Cloudinary Transformation Rule
+  if (url.includes('res.cloudinary.com')) {
+    const parts = url.split('/upload/');
+    if (parts.length === 2) {
+      // Use w_300, q_auto, f_auto for optimized thumbnails
+      return `${parts[0]}/upload/w_300,q_auto,f_auto/${parts[1]}`;
+    }
+  }
+
+  // Local Thumbnail Rule (Mapping /images/ to /thumbnails/)
+  if (url.includes('/images/')) {
+    return url.replace('/images/', '/thumbnails/').replace(/([^/]+)$/, 'thumb_$1');
+  }
+
+  return url;
+};
+
+// Helper to generate a local thumbnail file by copying the original
+const generateLocalThumbnail = (imageUrl) => {
+  if (!imageUrl || imageUrl.includes('res.cloudinary.com')) return;
+  if (!imageUrl.includes('/images/')) return;
+
+  try {
+    // Convert URL back to filesystem path
+    const filename = imageUrl.split('/images/')[1];
+    if (!filename) return;
+
+    // Use paths relative to backend root
+    const uploadDir = path.join(__dirname, "..", "upload", "images");
+    const thumbnailDir = path.join(__dirname, "..", "upload", "thumbnails");
+
+    const originalPath = path.join(uploadDir, filename);
+    const thumbnailPath = path.join(thumbnailDir, `thumb_${filename}`);
+
+    if (fs.existsSync(originalPath) && !fs.existsSync(thumbnailPath)) {
+      fs.copyFileSync(originalPath, thumbnailPath);
+      console.log(`✅ Thumbnail generated locally: ${thumbnailPath}`);
+    }
+  } catch (error) {
+    console.error("❌ Error generating thumbnail:", error.message);
+  }
 };
 
 router.post("/add", upload.single('imageFile'), async (req, res) => {
@@ -84,6 +126,11 @@ router.post("/add", upload.single('imageFile'), async (req, res) => {
       image: originalImageUrl,             // HIGH QUALITY
       thumbnail: createThumbnailUrl(originalImageUrl), // LOW QUALITY (Required by Schema)
     });
+
+    // Generate local thumbnail file if not on Cloudinary
+    if (!isCloudinaryConfigured) {
+      generateLocalThumbnail(product.image);
+    }
 
     await product.save();
     res.json({ success: true, product });
