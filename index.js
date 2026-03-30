@@ -24,6 +24,15 @@ if (!fs.existsSync(uploadDir)) {
 // Serve locally uploaded or seeded images statically
 app.use("/images", express.static(uploadDir));
 
+// Ensure thumbnail directory exists for local seeding
+const thumbnailDir = path.join(__dirname, "upload", "thumbnails");
+if (!fs.existsSync(thumbnailDir)) {
+  fs.mkdirSync(thumbnailDir, { recursive: true });
+}
+
+// Serve thumbnails statically
+app.use("/thumbnails", express.static(thumbnailDir));
+
 // Configure Cloudinary
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -93,13 +102,13 @@ const productRoutes = require("./routes/products");
 const authRoutes = require("./routes/auth");
 const cartRoutes = require("./routes/cart");
 const adminRoutes = require("./routes/admin");
-const orderRoutes = require("./routes/orders");
+// const orderRoutes = require("./routes/orders");
 
 app.use("/api/products", productRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/admin", adminRoutes);
-app.use("/api/orders", orderRoutes);
+// app.use("/api/orders", orderRoutes);
 
 // Health check
 app.get("/", (req, res) => {
@@ -453,6 +462,7 @@ async function seedDatabase() {
   const docs = products.map((p) => ({
     ...p,
     image: `${BASE_URL}/images/${p.image}`,
+    thumbnail: `${BASE_URL}/thumbnails/thumb_${p.image.replace(/\.(png|jpg|jpeg|webp)$/, ".jpg")}`,
   }));
   await Product.insertMany(docs);
   console.log(`🌱 Seeded ${docs.length} products into database`);

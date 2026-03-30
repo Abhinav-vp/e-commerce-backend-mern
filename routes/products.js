@@ -38,37 +38,51 @@ router.get("/category/:category", async (req, res) => {
   }
 });
 
-// GET single product by id
-router.get("/:id", async (req, res) => {
-  try {
-    const product = await Product.findOne({ id: Number(req.params.id) });
-    if (!product) {
-      return res.status(404).json({ success: false, error: "Product not found" });
-    }
-    res.json(product);
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+const upload = require("../middleware/cloudinary"); 
 
-// POST add a new product
-router.post("/add", async (req, res) => {
+// --- Check for Cloudinary configuration (mirroring index.js) ---
+const isCloudinaryConfigured =
+  process.env.CLOUDINARY_CLOUD_NAME &&
+  process.env.CLOUDINARY_CLOUD_NAME !== "your_cloud_name";
+
+// --- Helper must be at the top ---
+const createThumbnailUrl = (url) => {
+  if (!url || !url.includes('res.cloudinary.com')) return url;
+  const parts = url.split('/upload/');
+  return `${parts[0]}/upload/w_300,q_60,f_auto/${parts[1]}`;
+};
+
+router.post("/add", upload.single('imageFile'), async (req, res) => {
   try {
-    // Auto-generate the next product id
-    const products = await Product.find({});
-    let id = 1;
-    if (products.length > 0) {
-      const lastProduct = products[products.length - 1];
-      id = lastProduct.id + 1;
+    const lastProduct = await Product.findOne().sort({ id: -1 });
+    const id = lastProduct ? lastProduct.id + 1 : 1;
+
+    // Use the uploaded file path OR the string URL from the body
+    let originalImageUrl;
+    if (req.file) {
+      if (isCloudinaryConfigured) {
+        originalImageUrl = req.file.path;
+      } else {
+        const port = process.env.PORT || 4000;
+        const baseUrl = process.env.BASE_URL || `http://localhost:${port}`;
+        originalImageUrl = `${baseUrl}/images/${req.file.filename}`;
+      }
+    } else {
+      originalImageUrl = req.body.image;
+    }
+
+    if (!originalImageUrl) {
+      return res.status(400).json({ success: false, error: "Image is required" });
     }
 
     const product = new Product({
       id,
       name: req.body.name,
-      image: req.body.image,
       category: req.body.category,
       new_price: req.body.new_price,
       old_price: req.body.old_price,
+      image: originalImageUrl,             // HIGH QUALITY
+      thumbnail: createThumbnailUrl(originalImageUrl), // LOW QUALITY (Required by Schema)
     });
 
     await product.save();

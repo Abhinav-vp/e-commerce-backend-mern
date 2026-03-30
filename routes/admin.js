@@ -3,15 +3,14 @@ const router = express.Router();
 const Product = require("../models/Product");
 const User = require("../models/User");
 const fetchUser = require("../middleware/auth");
+const upload = require("../middleware/cloudinary"); // Import your new middleware
 
-
+// (Keep your existing verifyAdmin middleware here)
 const verifyAdmin = async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id);
     if (!user || !user.isAdmin) {
-      return res
-        .status(403)
-        .json({ success: false, error: "Admin access required" });
+      return res.status(403).json({ success: false, error: "Admin access required" });
     }
     next();
   } catch (error) {
@@ -19,10 +18,26 @@ const verifyAdmin = async (req, res, next) => {
   }
 };
 
+// --- Check for Cloudinary configuration (mirroring index.js) ---
+const isCloudinaryConfigured =
+  process.env.CLOUDINARY_CLOUD_NAME &&
+  process.env.CLOUDINARY_CLOUD_NAME !== "your_cloud_name";
 
+const createThumbnailUrl = (originalUrl) => {
+  if (!originalUrl || !originalUrl.includes('res.cloudinary.com')) return originalUrl;
+
+  // Use a more robust split to ensure we only target the transformation section
+  const parts = originalUrl.split('/upload/');
+  
+  // Added f_auto (WebP conversion) and removed redundant h_300 to let it scale naturally
+  return `${parts[0]}/upload/w_300,q_60,f_auto/${parts[1]}`;
+};
+
+
+// --- 1. GET ALL PRODUCTS (FOR ADMIN) ---
 router.get("/products", fetchUser, verifyAdmin, async (req, res) => {
   try {
-    const products = await Product.find({});
+    const products = await Product.find({}).sort({ id: -1 });
     res.json({ success: true, products });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -30,73 +45,104 @@ router.get("/products", fetchUser, verifyAdmin, async (req, res) => {
 });
 
 
-router.post("/products/add", fetchUser, verifyAdmin, async (req, res) => {
+// --- 2. ADD PRODUCT ROUTE ---
+// Notice the `upload.single('imageFile')` added to the route
+router.post("/products/add", fetchUser, verifyAdmin, upload.single('imageFile'), async (req, res) => {
   try {
-    const { id, name, category, image, new_price, old_price } = req.body;
-
-
-    if (!id || !name || !category || !image || !new_price || !old_price) {
-      return res
-        .status(400)
-        .json({ success: false, error: "All fields are required" });
+    const { id, name, category, new_price, old_price, sub_images } = req.body;
+    
+    // If a file was uploaded, use the correctly built path.
+    let originalImageUrl;
+    if (req.file) {
+      if (isCloudinaryConfigured) {
+        originalImageUrl = req.file.path;
+      } else {
+        const port = process.env.PORT || 4000;
+        const baseUrl = process.env.BASE_URL || `http://localhost:${port}`;
+        originalImageUrl = `${baseUrl}/images/${req.file.filename}`;
+      }
+    } else {
+      originalImageUrl = req.body.image;
     }
 
+    if (!id || !name || !category || !originalImageUrl || !new_price || !old_price) {
+      return res.status(400).json({ success: false, error: "All fields are required" });
+    }
 
     const existingProduct = await Product.findOne({ id });
     if (existingProduct) {
-      return res
-        .status(400)
-        .json({ success: false, error: "Product with this ID already exists" });
+      return res.status(400).json({ success: false, error: "Product with this ID already exists" });
     }
+
+    // Generate the thumbnail URL using our helper function
+    const thumbnailUrl = createThumbnailUrl(originalImageUrl);
+    const subThumbnails = (sub_images || []).map(url => createThumbnailUrl(url));
 
     const newProduct = new Product({
       id,
       name,
       category,
-      image,
+      image: originalImageUrl, // Saves high quality (e.g. 2MB)
+      thumbnail: thumbnailUrl, // Saves low quality (e.g. 15KB)
+      sub_images: sub_images || [],
+      sub_thumbnails: subThumbnails,
       new_price,
       old_price,
     });
 
     await newProduct.save();
-    res.json({
-      success: true,
-      message: "Product added successfully",
-      product: newProduct,
-    });
+    res.json({ success: true, message: "Product added successfully", product: newProduct });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
 
-router.put("/products/:id", fetchUser, verifyAdmin, async (req, res) => {
+// --- 2. UPDATE PRODUCT ROUTE ---
+router.put("/products/:id", fetchUser, verifyAdmin, upload.single('imageFile'), async (req, res) => {
   try {
-    const { name, category, image, new_price, old_price } = req.body;
+    const { name, category, new_price, old_price, sub_images } = req.body;
     const product = await Product.findOne({ id: Number(req.params.id) });
 
     if (!product) {
-      return res
-        .status(404)
-        .json({ success: false, error: "Product not found" });
+      return res.status(404).json({ success: false, error: "Product not found" });
     }
 
+    // Update text fields
     if (name) product.name = name;
     if (category) product.category = category;
-    if (image) product.image = image;
     if (new_price) product.new_price = new_price;
     if (old_price) product.old_price = old_price;
+    if (sub_images) {
+      product.sub_images = sub_images;
+      product.sub_thumbnails = sub_images.map(url => createThumbnailUrl(url));
+    }
+
+    // IMAGE UPDATE LOGIC
+    if (req.file) {
+      // New file uploaded: Create fresh URLs
+      if (isCloudinaryConfigured) {
+        product.image = req.file.path;
+      } else {
+        const port = process.env.PORT || 4000;
+        const baseUrl = process.env.BASE_URL || `http://localhost:${port}`;
+        product.image = `${baseUrl}/images/${req.file.filename}`;
+      }
+      product.thumbnail = createThumbnailUrl(product.image);
+    } else if (req.body.image && !req.body.image.includes('w_300,q_60')) {
+      // If a new URL is provided as a string and isn't already a thumbnail
+      product.image = req.body.image;
+      product.thumbnail = createThumbnailUrl(req.body.image);
+    }
 
     await product.save();
-    res.json({
-      success: true,
-      message: "Product updated successfully",
-      product,
-    });
+    res.json({ success: true, message: "Product updated successfully", product });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
+// (Keep your existing delete, users, and orders routes below this...)
 
 router.delete("/products/:id", fetchUser, verifyAdmin, async (req, res) => {
   try {

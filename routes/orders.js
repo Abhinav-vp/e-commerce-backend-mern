@@ -6,12 +6,12 @@ const fetchUser = require("../middleware/auth");
 const Razorpay = require("razorpay");
 const crypto = require("crypto");
 
-// Initialize Razorpay
-// These will be taken from .env
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
+// // Initialize Razorpay
+// // These will be taken from .env
+// const razorpay = new Razorpay({
+//   key_id: process.env.RAZORPAY_KEY_ID,
+//   key_secret: process.env.RAZORPAY_KEY_SECRET,
+// });
 
 // POST Create Order (COD or Razorpay)
 router.post("/place", fetchUser, async (req, res) => {
