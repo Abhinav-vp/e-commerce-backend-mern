@@ -6,6 +6,7 @@ const fetchUser = require("../middleware/auth");
 const upload = require("../middleware/cloudinary"); // Import your new middleware
 const fs = require("fs");
 const path = require("path");
+const { createThumbnailUrl, generateLocalThumbnail } = require("../utils/imageUtils");
 
 // (Keep your existing verifyAdmin middleware here)
 const verifyAdmin = async (req, res, next) => {
@@ -20,56 +21,7 @@ const verifyAdmin = async (req, res, next) => {
   }
 };
 
-// --- Check for Cloudinary configuration (mirroring index.js) ---
-const isCloudinaryConfigured =
-  process.env.CLOUDINARY_CLOUD_NAME &&
-  process.env.CLOUDINARY_CLOUD_NAME !== "your_cloud_name";
-
-const createThumbnailUrl = (url) => {
-  if (!url) return url;
-  
-  // Cloudinary Transformation Rule
-  if (url.includes('res.cloudinary.com')) {
-    const parts = url.split('/upload/');
-    if (parts.length === 2) {
-      // Use w_300, q_auto, f_auto for optimized thumbnails
-      return `${parts[0]}/upload/w_300,q_auto,f_auto/${parts[1]}`;
-    }
-  }
-
-  // Local Thumbnail Rule (Mapping /images/ to /thumbnails/)
-  if (url.includes('/images/')) {
-    return url.replace('/images/', '/thumbnails/').replace(/([^/]+)$/, 'thumb_$1');
-  }
-
-  return url;
-};
-
-// Helper to generate a local thumbnail file by copying the original
-const generateLocalThumbnail = (imageUrl) => {
-  if (!imageUrl || imageUrl.includes('res.cloudinary.com')) return;
-  if (!imageUrl.includes('/images/')) return;
-
-  try {
-    // Convert URL back to filesystem path
-    const filename = imageUrl.split('/images/')[1];
-    if (!filename) return;
-
-    // Use paths relative to backend root
-    const uploadDir = path.join(__dirname, "..", "upload", "images");
-    const thumbnailDir = path.join(__dirname, "..", "upload", "thumbnails");
-
-    const originalPath = path.join(uploadDir, filename);
-    const thumbnailPath = path.join(thumbnailDir, `thumb_${filename}`);
-
-    if (fs.existsSync(originalPath) && !fs.existsSync(thumbnailPath)) {
-      fs.copyFileSync(originalPath, thumbnailPath);
-      console.log(`✅ Thumbnail generated locally: ${thumbnailPath}`);
-    }
-  } catch (error) {
-    console.error("❌ Error generating thumbnail:", error.message);
-  }
-};
+// --- Image Utilities are now imported from ../utils/imageUtils ---
 
 
 // --- 1. GET ALL PRODUCTS (FOR ADMIN) ---
@@ -128,10 +80,12 @@ router.post("/products/add", fetchUser, verifyAdmin, upload.single('imageFile'),
       old_price,
     });
 
-    // Generate local thumbnail file if not on Cloudinary
+    // Generate local thumbnail file if not on Cloudinary (await as it's now async)
     if (!isCloudinaryConfigured) {
-      generateLocalThumbnail(newProduct.image);
-      (newProduct.sub_images || []).forEach(url => generateLocalThumbnail(url));
+      await generateLocalThumbnail(newProduct.image);
+      for (const url of (newProduct.sub_images || [])) {
+        await generateLocalThumbnail(url);
+      }
     }
 
     await newProduct.save();
@@ -179,10 +133,12 @@ router.put("/products/:id", fetchUser, verifyAdmin, upload.single('imageFile'), 
       product.thumbnail = createThumbnailUrl(req.body.image);
     }
 
-    // Generate local thumbnail file if not on Cloudinary
+    // Generate local thumbnail file if not on Cloudinary (await as it's now async)
     if (!isCloudinaryConfigured) {
-      generateLocalThumbnail(product.image);
-      (product.sub_images || []).forEach(url => generateLocalThumbnail(url));
+      await generateLocalThumbnail(product.image);
+      for (const url of (product.sub_images || [])) {
+        await generateLocalThumbnail(url);
+      }
     }
 
     await product.save();
