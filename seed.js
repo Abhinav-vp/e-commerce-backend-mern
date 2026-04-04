@@ -1,8 +1,9 @@
-require("dotenv").config();
+const path = require("path");
+require("dotenv").config({ path: path.join(__dirname, ".env") });
 const mongoose = require("mongoose");
 const Product = require("./models/Product");
 const fs = require("fs");
-const path = require("path");
+// path is already required at the top
 
 const FRONTEND_ASSETS = path.join(
   __dirname,

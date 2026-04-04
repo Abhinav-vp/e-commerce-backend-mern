@@ -1,9 +1,10 @@
-require("dotenv").config();
+const path = require("path");
+require("dotenv").config({ path: path.join(__dirname, ".env") });
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const multer = require("multer");
-const path = require("path");
+// path is already required at the top
 const fs = require("fs");
 const cloudinary = require("cloudinary").v2;
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
@@ -87,16 +88,6 @@ app.post("/upload", upload.single("product"), (req, res) => {
   });
 });
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error("Unhandle Error:", err);
-  res.status(500).json({
-    success: false,
-    message: err.message || "Internal Server Error",
-    error: process.env.NODE_ENV === "development" ? err : {},
-  });
-});
-
 // Routes
 const productRoutes = require("./routes/products");
 const authRoutes = require("./routes/auth");
@@ -113,6 +104,16 @@ app.use("/api/orders", orderRoutes);
 // Health check
 app.get("/", (req, res) => {
   res.json({ status: "E-Commerce API is running" });
+});
+
+// Error handling middleware (must be AFTER all routes)
+app.use((err, req, res, next) => {
+  console.error("Unhandled Error:", err);
+  res.status(500).json({
+    success: false,
+    message: err.message || "Internal Server Error",
+    error: process.env.NODE_ENV === "development" ? err : {},
+  });
 });
 
 // ---------- Seed function (runs on first in-memory start) ----------

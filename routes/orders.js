@@ -5,7 +5,12 @@ const User = require("../models/User");
 const fetchUser = require("../middleware/auth");
 const Razorpay = require("razorpay");
 const crypto = require("crypto");
-const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+let stripe;
+if (process.env.STRIPE_SECRET_KEY) {
+  stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+} else {
+  console.warn("⚠️ STRIPE_SECRET_KEY is missing. Stripe payments will be disabled.");
+}
 
 // // Initialize Razorpay
 // // These will be taken from .env
@@ -19,6 +24,15 @@ router.post("/place", fetchUser, async (req, res) => {
   try {
     const { items, amount, address, paymentMethod } = req.body;
     const userId = req.user.id;
+
+    // Validate order has items
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ success: false, message: "Cart is empty. Please add items before placing an order." });
+    }
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ success: false, message: "Invalid order amount." });
+    }
 
     // Create a new order in DB
     const newOrder = new Order({
@@ -54,17 +68,27 @@ router.post("/place", fetchUser, async (req, res) => {
         res.json({ success: true, order, orderId: newOrder._id });
       });
     } else if (paymentMethod === "Stripe") {
+      if (!stripe) {
+        return res.status(500).json({ success: false, message: "Stripe configuration is missing on the server" });
+      }
+      
       // Create Stripe checkout session
-      const line_items = items.map((item) => ({
-        price_data: {
-          currency: "usd",
-          product_data: {
-            name: item.name,
+      const line_items = items
+        .filter((item) => item.name && item.new_price > 0 && item.quantity > 0)
+        .map((item) => ({
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: item.name,
+            },
+            unit_amount: Math.round(item.new_price * 100), // Stripe expects amount in cents
           },
-          unit_amount: item.new_price * 100, // Stripe expects amount in cents
-        },
-        quantity: item.quantity,
-      }));
+          quantity: item.quantity,
+        }));
+
+      if (line_items.length === 0) {
+        return res.status(400).json({ success: false, message: "No valid items found for Stripe checkout." });
+      }
 
       // Add shipping if any (currently free)
       // For now, only products
