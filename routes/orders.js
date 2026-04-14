@@ -6,11 +6,20 @@ const fetchUser = require("../middleware/auth");
 const Razorpay = require("razorpay");
 const crypto = require("crypto");
 
-// Initialize Razorpay
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
+// Lazy-initialize Razorpay (avoids crash when env vars are missing)
+let razorpay;
+function getRazorpay() {
+  if (!razorpay) {
+    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+      throw new Error("Razorpay keys are not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET environment variables.");
+    }
+    razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });
+  }
+  return razorpay;
+}
 
 // POST Create Order (COD or Razorpay)
 router.post("/place", fetchUser, async (req, res) => {
@@ -50,7 +59,7 @@ router.post("/place", fetchUser, async (req, res) => {
         receipt: `receipt_${Date.now()}`,
       };
 
-      razorpay.orders.create(options, async (err, order) => {
+      getRazorpay().orders.create(options, async (err, order) => {
         if (err) {
           console.error("Razorpay Order Error:", err);
           return res.status(500).json({ success: false, message: "Razorpay Error" });
