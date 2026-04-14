@@ -104,4 +104,66 @@ router.get("/userorders", fetchUser, async (req, res) => {
   }
 });
 
+// GET Track Order Details (Enhanced simulated Google Tracking)
+router.get("/track/:orderId", fetchUser, async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.orderId);
+    if (!order) {
+      return res.status(404).json({ success: false, message: "Order not found" });
+    }
+
+    // Define coordinates for simulation (London area or any set coordinates)
+    const warehouseCoords = { lat: 51.5074, lng: -0.1278 };
+    const deliveryCoords = { lat: 51.6500, lng: 0.1000 };
+
+    // Generate a simple linear route between warehouse and delivery
+    const generateRoutePoints = (start, end, steps = 20) => {
+      const points = [];
+      for (let i = 0; i <= steps; i++) {
+        points.push({
+          lat: start.lat + (end.lat - start.lat) * (i / steps),
+          lng: start.lng + (end.lng - start.lng) * (i / steps),
+        });
+      }
+      return points;
+    };
+
+    const routePoints = generateRoutePoints(warehouseCoords, deliveryCoords);
+
+    // Determine current driver index based on status
+    let driverIndex = 0;
+    if (order.status === "Processing") driverIndex = 5;
+    if (order.status === "Shipped") driverIndex = 12;
+    if (order.status === "Out for Delivery") driverIndex = 18;
+    if (order.status === "Delivered") driverIndex = 20;
+
+    // Mock tracking milestones based on order status and date
+    const milestones = [
+      { status: "Order Placed", time: new Date(order.date).toLocaleString(), location: "System", completed: true },
+      { status: "Processing", time: new Date(order.date + 3600000).toLocaleString(), location: "Warehouse A", completed: ["Processing", "Shipped", "Out for Delivery", "Delivered"].includes(order.status) },
+      { status: "Shipped", time: new Date(order.date + 86400000).toLocaleString(), location: "Distribution Center", completed: ["Shipped", "Out for Delivery", "Delivered"].includes(order.status) },
+      { status: "Out for Delivery", time: new Date(order.date + 172800000).toLocaleString(), location: "Local Hub", completed: ["Out for Delivery", "Delivered"].includes(order.status) },
+      { status: "Delivered", time: new Date(order.date + 200000000).toLocaleString(), location: order.address.city || "Delivery Address", completed: order.status === "Delivered" },
+    ];
+
+    res.json({
+      success: true,
+      status: order.status,
+      milestones,
+      routePoints,
+      currentLocation: routePoints[driverIndex],
+      destination: deliveryCoords,
+      origin: warehouseCoords,
+      orderId: order._id,
+      amount: order.amount,
+      address: order.address,
+      estimatedArrival: new Date(order.date + 200000000).toLocaleString(),
+    });
+  } catch (error) {
+    console.error("Tracking Error:", error);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
+});
+
 module.exports = router;
+

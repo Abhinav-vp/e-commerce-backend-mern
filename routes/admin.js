@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const Product = require("../models/Product");
 const User = require("../models/User");
+const Order = require("../models/Order");
 const fetchUser = require("../middleware/auth");
 const upload = require("../middleware/cloudinary"); // Import your new middleware
 const fs = require("fs");
@@ -223,40 +224,29 @@ router.delete("/users/:id", fetchUser, verifyAdmin, async (req, res) => {
   }
 });
 
+// --- GET ALL ORDERS ---
 router.get("/orders", fetchUser, verifyAdmin, async (req, res) => {
   try {
-    const orders = [
-      {
-        _id: "order_1",
-        userId: "user_1",
-        products: [
-          { id: 1, quantity: 2 },
-          { id: 3, quantity: 1 },
-        ],
-        totalAmount: 235.0,
-        status: "pending",
-        createdAt: new Date(),
-      },
-      {
-        _id: "order_2",
-        userId: "user_2",
-        products: [{ id: 5, quantity: 1 }],
-        totalAmount: 85.0,
-        status: "completed",
-        createdAt: new Date(),
-      },
-    ];
-
-    res.json({ success: true, orders });
+    const orders = await Order.find({}).sort({ date: -1 });
+    res.json({ success: true, orders: orders.map(o => ({
+      ...o._doc,
+      totalAmount: o.amount, // normalize for frontend
+      createdAt: o.date
+    })) });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
+// --- UPDATE ORDER STATUS ---
 router.put("/orders/:id", fetchUser, verifyAdmin, async (req, res) => {
   try {
     const { status } = req.body;
-    res.json({ success: true, message: "Order status updated", status });
+    const order = await Order.findByIdAndUpdate(req.params.id, { status }, { new: true });
+    if (!order) {
+      return res.status(404).json({ success: false, error: "Order not found" });
+    }
+    res.json({ success: true, message: "Order status updated", status: order.status });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
