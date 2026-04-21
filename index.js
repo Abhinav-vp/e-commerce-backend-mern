@@ -94,12 +94,14 @@ const authRoutes = require("./routes/auth");
 const cartRoutes = require("./routes/cart");
 const adminRoutes = require("./routes/admin");
 const orderRoutes = require("./routes/orders");
+const reviewRoutes = require("./routes/reviews");
 
 app.use("/api/products", productRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/orders", orderRoutes);
+app.use("/api/reviews", reviewRoutes);
 
 // Health check
 app.get("/", (req, res) => {

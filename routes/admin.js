@@ -40,8 +40,12 @@ router.get("/products", fetchUser, verifyAdmin, async (req, res) => {
 // Notice the `upload.single('imageFile')` added to the route
 router.post("/products/add", fetchUser, verifyAdmin, upload.single('imageFile'), async (req, res) => {
   try {
-    const { id, name, category, new_price, old_price, sub_images } = req.body;
+    const { name, category, new_price, old_price, sub_images } = req.body;
     
+    // Auto-generate the next available ID
+    const lastProduct = await Product.findOne().sort({ id: -1 });
+    const id = lastProduct ? lastProduct.id + 1 : 1;
+
     // If a file was uploaded, use the correctly built path.
     let originalImageUrl;
     if (req.file) {
@@ -56,13 +60,21 @@ router.post("/products/add", fetchUser, verifyAdmin, upload.single('imageFile'),
       originalImageUrl = req.body.image;
     }
 
-    if (!id || !name || !category || !originalImageUrl || !new_price || !old_price) {
-      return res.status(400).json({ success: false, error: "All fields are required" });
+    if (!name) return res.status(400).json({ success: false, error: "Product Name is required" });
+    if (!category) return res.status(400).json({ success: false, error: "Category is required" });
+    if (!originalImageUrl) return res.status(400).json({ success: false, error: "Main image is required" });
+    if (!new_price) return res.status(400).json({ success: false, error: "New Price is required" });
+    if (!old_price) return res.status(400).json({ success: false, error: "Old Price is required" });
+
+    const newPriceValue = parseFloat(new_price);
+    const oldPriceValue = parseFloat(old_price);
+
+    if (newPriceValue <= 0 || oldPriceValue <= 0) {
+      return res.status(400).json({ success: false, error: "Prices must be greater than zero" });
     }
 
-    const existingProduct = await Product.findOne({ id });
-    if (existingProduct) {
-      return res.status(400).json({ success: false, error: "Product with this ID already exists" });
+    if (newPriceValue > oldPriceValue) {
+      return res.status(400).json({ success: false, error: "New Price cannot be higher than Old Price" });
     }
 
     // Generate the thumbnail URL using our helper function
@@ -110,11 +122,26 @@ router.put("/products/:id", fetchUser, verifyAdmin, upload.single('imageFile'), 
     // Update text fields
     if (name) product.name = name;
     if (category) product.category = category;
-    if (new_price) product.new_price = new_price;
-    if (old_price) product.old_price = old_price;
     if (sub_images) {
       product.sub_images = sub_images;
       product.sub_thumbnails = sub_images.map(url => createThumbnailUrl(url));
+    }
+
+    // New price validation
+    if (new_price || old_price) {
+      const updatedNewPrice = new_price ? parseFloat(new_price) : product.new_price;
+      const updatedOldPrice = old_price ? parseFloat(old_price) : product.old_price;
+
+      if (updatedNewPrice <= 0 || updatedOldPrice <= 0) {
+        return res.status(400).json({ success: false, error: "Prices must be greater than zero" });
+      }
+
+      if (updatedNewPrice > updatedOldPrice) {
+        return res.status(400).json({ success: false, error: "New Price cannot be higher than Old Price" });
+      }
+
+      product.new_price = updatedNewPrice;
+      product.old_price = updatedOldPrice;
     }
 
     // IMAGE UPDATE LOGIC

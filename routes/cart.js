@@ -8,10 +8,11 @@ router.post("/add", fetchUser, async (req, res) => {
   try {
     const userData = await User.findById(req.user.id);
     const cartData = userData.cartData || {};
-    const { itemId, size } = req.body;
+    const { itemId, size, quantity } = req.body;
     const cartKey = size ? `${itemId}_${size}` : itemId;
+    const addQuantity = Number(quantity) || 1;
 
-    cartData[cartKey] = (cartData[cartKey] || 0) + 1;
+    cartData[cartKey] = (cartData[cartKey] || 0) + addQuantity;
 
     await User.findByIdAndUpdate(req.user.id, { cartData });
     res.json({ success: true, message: "Item added to cart" });
