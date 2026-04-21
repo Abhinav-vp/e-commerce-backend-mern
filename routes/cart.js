@@ -8,9 +8,10 @@ router.post("/add", fetchUser, async (req, res) => {
   try {
     const userData = await User.findById(req.user.id);
     const cartData = userData.cartData || {};
-    const itemId = req.body.itemId;
+    const { itemId, size } = req.body;
+    const cartKey = size ? `${itemId}_${size}` : itemId;
 
-    cartData[itemId] = (cartData[itemId] || 0) + 1;
+    cartData[cartKey] = (cartData[cartKey] || 0) + 1;
 
     await User.findByIdAndUpdate(req.user.id, { cartData });
     res.json({ success: true, message: "Item added to cart" });
@@ -24,10 +25,14 @@ router.post("/remove", fetchUser, async (req, res) => {
   try {
     const userData = await User.findById(req.user.id);
     const cartData = userData.cartData || {};
-    const itemId = req.body.itemId;
+    const { itemId, size } = req.body;
+    const cartKey = size ? `${itemId}_${size}` : itemId;
 
-    if (cartData[itemId] && cartData[itemId] > 0) {
-      cartData[itemId] -= 1;
+    if (cartData[cartKey] && cartData[cartKey] > 0) {
+      cartData[cartKey] -= 1;
+      if (cartData[cartKey] === 0) {
+        delete cartData[cartKey];
+      }
     }
 
     await User.findByIdAndUpdate(req.user.id, { cartData });
