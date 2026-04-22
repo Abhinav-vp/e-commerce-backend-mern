@@ -8,6 +8,8 @@ const orderSchema = new mongoose.Schema({
   status: { type: String, default: "Order Placed" },
   paymentMethod: { type: String, required: true },
   payment: { type: Boolean, default: false },
+  promoCode: { type: String, default: null },
+  discount: { type: Number, default: 0 },
   date: { type: Number, default: Date.now() },
 });
 

@@ -24,7 +24,7 @@ function getRazorpay() {
 // POST Create Order (COD or Razorpay)
 router.post("/place", fetchUser, async (req, res) => {
   try {
-    const { items, amount, address, paymentMethod } = req.body;
+    const { items, amount, address, paymentMethod, promoCode } = req.body;
     const userId = req.user.id;
 
     // Validate order has items
@@ -36,13 +36,44 @@ router.post("/place", fetchUser, async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid order amount." });
     }
 
+    // Server-side promo code validation & discount calculation
+    let discount = 0;
+    let appliedPromoCode = null;
+
+    if (promoCode) {
+      const PromoCode = require("../models/PromoCode");
+      const promo = await PromoCode.findOne({ code: promoCode.toUpperCase().trim() });
+
+      if (promo && promo.isActive) {
+        const notExpired = !promo.expiresAt || new Date() <= promo.expiresAt;
+        const withinUsageLimit = promo.maxUses === 0 || promo.usedCount < promo.maxUses;
+        const meetsMinimum = amount >= promo.minOrderAmount;
+
+        if (notExpired && withinUsageLimit && meetsMinimum) {
+          if (promo.discountType === "percentage") {
+            discount = Math.round((amount * promo.discountValue) / 100 * 100) / 100;
+          } else {
+            discount = Math.min(promo.discountValue, amount);
+          }
+          appliedPromoCode = promo.code;
+          // Increment usage count
+          promo.usedCount += 1;
+          await promo.save();
+        }
+      }
+    }
+
+    const finalAmount = Math.max(0, amount - discount);
+
     // Create a new order in DB
     const newOrder = new Order({
       userId,
       items,
-      amount,
+      amount: finalAmount,
       address,
       paymentMethod,
+      promoCode: appliedPromoCode,
+      discount,
       date: Date.now(),
     });
 
@@ -54,7 +85,7 @@ router.post("/place", fetchUser, async (req, res) => {
     } else if (paymentMethod === "Razorpay") {
       // Create Razorpay order
       const options = {
-        amount: amount * 100, // in paise
+        amount: Math.round(finalAmount * 100), // in paise
         currency: "INR",
         receipt: `receipt_${Date.now()}`,
       };
