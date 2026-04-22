@@ -40,7 +40,7 @@ router.post("/signup", async (req, res) => {
     const data = { user: { id: user.id } };
     const token = jwt.sign(data, process.env.JWT_SECRET);
 
-    res.json({ success: true, token });
+    res.json({ success: true, token, isAdmin: user.isAdmin });
   } catch (error) {
     res.status(500).json({ success: false, errors: error.message });
   }
@@ -81,7 +81,7 @@ router.post("/login", async (req, res) => {
     const data = { user: { id: user.id } };
     const token = jwt.sign(data, process.env.JWT_SECRET);
 
-    res.json({ success: true, token });
+    res.json({ success: true, token, isAdmin: user.isAdmin });
   } catch (error) {
     res.status(500).json({ success: false, errors: error.message });
   }
