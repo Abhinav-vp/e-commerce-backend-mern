@@ -96,6 +96,7 @@ const adminRoutes = require("./routes/admin");
 const orderRoutes = require("./routes/orders");
 const reviewRoutes = require("./routes/reviews");
 const promoRoutes = require("./routes/promo");
+const wishlistRoutes = require("./routes/wishlist");
 
 app.use("/api/products", productRoutes);
 app.use("/api/auth", authRoutes);
@@ -104,6 +105,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/promo", promoRoutes);
+app.use("/api/wishlist", wishlistRoutes);
 
 // Health check
 app.get("/", (req, res) => {

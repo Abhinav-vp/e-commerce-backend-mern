@@ -18,6 +18,10 @@ const userSchema = new mongoose.Schema({
     type: Object,
     default: {},
   },
+  wishlist: {
+    type: [Number],
+    default: [],
+  },
   isAdmin: {
     type: Boolean,
     default: false,
