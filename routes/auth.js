@@ -3,6 +3,9 @@ const router = express.Router();
 const User = require("../models/User");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
+const fetchUser = require("../middleware/auth");
+
 
 // POST signup
 router.post("/signup", async (req, res) => {
@@ -26,12 +29,39 @@ router.post("/signup", async (req, res) => {
       cart[i] = 0;
     }
 
+    // Generate unique referral code
+    let referralCode = crypto.randomBytes(3).toString("hex").toUpperCase();
+    let isUnique = false;
+    while (!isUnique) {
+      const checkCode = await User.findOne({ referralCode });
+      if (!checkCode) {
+        isUnique = true;
+      } else {
+        referralCode = crypto.randomBytes(3).toString("hex").toUpperCase();
+      }
+    }
+
+    // Handle referral
+    let referredBy = "";
+    if (req.body.referralCode) {
+      const referrer = await User.findOne({ referralCode: req.body.referralCode });
+      if (referrer) {
+        referredBy = req.body.referralCode;
+        // Give bonus points to referrer
+        referrer.rewardPoints += 50; // 50 points for referral
+        await referrer.save();
+      }
+    }
+
     // Create user
     const user = new User({
       name: req.body.username,
       email: req.body.email,
       password: hashedPassword,
       cartData: cart,
+      referralCode,
+      referredBy,
+      rewardPoints: referredBy ? 20 : 0, // Give 20 points to referred user
     });
 
     await user.save();
@@ -82,6 +112,19 @@ router.post("/login", async (req, res) => {
     const token = jwt.sign(data, process.env.JWT_SECRET);
 
     res.json({ success: true, token, isAdmin: user.isAdmin });
+  } catch (error) {
+    res.status(500).json({ success: false, errors: error.message });
+  }
+});
+
+// GET user info
+router.get("/me", fetchUser, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select("-password");
+    if (!user) {
+      return res.status(404).json({ success: false, errors: "User not found" });
+    }
+    res.json({ success: true, user });
   } catch (error) {
     res.status(500).json({ success: false, errors: error.message });
   }

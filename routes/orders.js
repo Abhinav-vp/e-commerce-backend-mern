@@ -24,7 +24,7 @@ function getRazorpay() {
 // POST Create Order (COD or Razorpay)
 router.post("/place", fetchUser, async (req, res) => {
   try {
-    const { items, amount, address, paymentMethod, promoCode } = req.body;
+    const { items, amount, address, paymentMethod, promoCode, usePoints } = req.body;
     const userId = req.user.id;
 
     // Validate order has items
@@ -63,7 +63,29 @@ router.post("/place", fetchUser, async (req, res) => {
       }
     }
 
-    const finalAmount = Math.max(0, amount - discount);
+    let pointsDiscount = 0;
+    let redeemedPoints = 0;
+    const user = await User.findById(userId);
+
+    if (usePoints && user.rewardPoints > 0) {
+      // 10 points = $1
+      const maxPointsDiscount = (amount - discount) / 2; // Allow max 50% discount from points
+      const availablePointsDiscount = user.rewardPoints / 10;
+      
+      pointsDiscount = Math.min(availablePointsDiscount, maxPointsDiscount);
+      redeemedPoints = Math.round(pointsDiscount * 10);
+      
+      // Subtract points from user
+      user.rewardPoints -= redeemedPoints;
+      await user.save();
+    }
+
+    const finalAmount = Math.max(0, amount - discount - pointsDiscount);
+    const pointsEarned = Math.floor(finalAmount / 10); // 1 point per $10
+
+    // Add earned points to user
+    user.rewardPoints += pointsEarned;
+    await user.save();
 
     // Create a new order in DB
     const newOrder = new Order({
@@ -73,7 +95,9 @@ router.post("/place", fetchUser, async (req, res) => {
       address,
       paymentMethod,
       promoCode: appliedPromoCode,
-      discount,
+      discount: discount + pointsDiscount,
+      pointsUsed: redeemedPoints,
+      pointsEarned,
       date: Date.now(),
     });
 

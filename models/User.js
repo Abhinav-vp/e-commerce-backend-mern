@@ -26,6 +26,18 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  referralCode: {
+    type: String,
+    unique: true,
+  },
+  referredBy: {
+    type: String,
+    default: "",
+  },
+  rewardPoints: {
+    type: Number,
+    default: 0,
+  },
   date: {
     type: Date,
     default: Date.now,

@@ -10,6 +10,8 @@ const orderSchema = new mongoose.Schema({
   payment: { type: Boolean, default: false },
   promoCode: { type: String, default: null },
   discount: { type: Number, default: 0 },
+  pointsUsed: { type: Number, default: 0 },
+  pointsEarned: { type: Number, default: 0 },
   date: { type: Number, default: Date.now() },
 });
 
