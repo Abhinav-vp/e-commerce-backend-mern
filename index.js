@@ -10,6 +10,15 @@ const cloudinary = require("cloudinary").v2;
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
 
 const app = express();
+const http = require("http");
+const server = http.createServer(app);
+const { Server } = require("socket.io");
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+  },
+});
 const port = process.env.PORT || 4000;
 
 // Middleware
@@ -97,6 +106,7 @@ const orderRoutes = require("./routes/orders");
 const reviewRoutes = require("./routes/reviews");
 const promoRoutes = require("./routes/promo");
 const wishlistRoutes = require("./routes/wishlist");
+const chatRoutes = require("./routes/chat");
 
 app.use("/api/products", productRoutes);
 app.use("/api/auth", authRoutes);
@@ -106,6 +116,58 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/promo", promoRoutes);
 app.use("/api/wishlist", wishlistRoutes);
+app.use("/api/chat", chatRoutes);
+
+// Socket.io logic
+const Message = require("./models/Message");
+
+io.on("connection", (socket) => {
+  console.log("A user connected:", socket.id);
+
+  socket.on("join", (userId) => {
+    socket.join(userId);
+    console.log(`User ${userId} joined their room`);
+  });
+
+  socket.on("joinAdmin", () => {
+    socket.join("admins");
+    console.log("Admin joined the admins room");
+  });
+
+  socket.on("sendMessage", async (data) => {
+    try {
+      const { senderId, receiverId, senderName, message, isAdmin } = data;
+      
+      const newMessage = new Message({
+        senderId,
+        receiverId,
+        senderName,
+        message,
+        isAdmin
+      });
+      
+      await newMessage.save();
+
+      // If it's from user, send to admins
+      if (!isAdmin) {
+        io.to("admins").emit("receiveMessage", newMessage);
+      } else {
+        // If it's from admin, send to specific user
+        io.to(receiverId).emit("receiveMessage", newMessage);
+      }
+      
+      // Also send back to sender for instant update (though client can also do it)
+      socket.emit("messageSent", newMessage);
+      
+    } catch (error) {
+      console.error("Socket error:", error);
+    }
+  });
+
+  socket.on("disconnect", () => {
+    console.log("User disconnected");
+  });
+});
 
 // Health check
 app.get("/", (req, res) => {
@@ -498,7 +560,7 @@ async function startServer() {
   // Auto-seed if database is empty
   await seedDatabase();
 
-  app.listen(port, () => {
+  server.listen(port, () => {
     console.log(`🚀 Server running on http://localhost:${port}`);
   });
 }
