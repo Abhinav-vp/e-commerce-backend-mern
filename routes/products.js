@@ -4,6 +4,7 @@ const Product = require("../models/Product");
 const fs = require("fs");
 const path = require("path");
 const { createThumbnailUrl, generateLocalThumbnail } = require("../utils/imageUtils");
+const { upload, isS3Configured } = require("../middleware/upload");
 
 router.get("/", async (req, res) => {
   try {
@@ -41,7 +42,7 @@ router.get("/category/:category", async (req, res) => {
   }
 });
 
-const upload = require("../middleware/cloudinary"); 
+// const upload = require("../middleware/cloudinary"); // No longer needed, imported above 
 
 // --- Image Utilities are now imported from ../utils/imageUtils ---
 
@@ -53,8 +54,8 @@ router.post("/add", upload.single('imageFile'), async (req, res) => {
     // Use the uploaded file path OR the string URL from the body
     let originalImageUrl;
     if (req.file) {
-      if (isCloudinaryConfigured) {
-        originalImageUrl = req.file.path;
+      if (isS3Configured) {
+        originalImageUrl = req.file.location;
       } else {
         const port = process.env.PORT || 4000;
         const baseUrl = process.env.BASE_URL || `http://localhost:${port}`;
@@ -78,8 +79,8 @@ router.post("/add", upload.single('imageFile'), async (req, res) => {
       thumbnail: createThumbnailUrl(originalImageUrl), // LOW QUALITY (Required by Schema)
     });
 
-    // Generate local thumbnail file if not on Cloudinary (await as it's now async)
-    if (!isCloudinaryConfigured) {
+    // Generate local thumbnail file if not on S3 (await as it's now async)
+    if (!isS3Configured) {
       await generateLocalThumbnail(product.image);
     }
 

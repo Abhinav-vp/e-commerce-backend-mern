@@ -3,11 +3,8 @@ require("dotenv").config({ path: path.join(__dirname, ".env") });
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-const multer = require("multer");
-// path is already required at the top
 const fs = require("fs");
-const cloudinary = require("cloudinary").v2;
-const { CloudinaryStorage } = require("multer-storage-cloudinary");
+const { upload, isS3Configured } = require("./middleware/upload");
 
 const app = express();
 const http = require("http");
@@ -25,57 +22,11 @@ const port = process.env.PORT || 4000;
 app.use(express.json());
 app.use(cors());
 
-// Ensure upload directory exists for local seeding
+// Seeding and static folders
 const uploadDir = path.join(__dirname, "upload", "images");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-// Serve locally uploaded or seeded images statically
-app.use("/images", express.static(uploadDir));
-
-// Ensure thumbnail directory exists for local seeding
 const thumbnailDir = path.join(__dirname, "upload", "thumbnails");
-if (!fs.existsSync(thumbnailDir)) {
-  fs.mkdirSync(thumbnailDir, { recursive: true });
-}
-
-// Serve thumbnails statically
+app.use("/images", express.static(uploadDir));
 app.use("/thumbnails", express.static(thumbnailDir));
-
-// Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
-// Check for Cloudinary configuration
-const isCloudinaryConfigured =
-  process.env.CLOUDINARY_CLOUD_NAME &&
-  process.env.CLOUDINARY_CLOUD_NAME !== "your_cloud_name";
-
-let storage;
-
-if (isCloudinaryConfigured) {
-  storage = new CloudinaryStorage({
-    cloudinary: cloudinary,
-    params: {
-      folder: "ecommerce_products",
-      allowedFormats: ["jpeg", "png", "jpg", "webp"],
-    },
-  });
-} else {
-  // Use local disk storage as fallback
-  storage = multer.diskStorage({
-    destination: uploadDir,
-    filename: (req, file, cb) => {
-      cb(null, `${file.fieldname}_${Date.now()}${path.extname(file.originalname)}`);
-    },
-  });
-}
-
-const upload = multer({ storage });
 
 // Image upload endpoint
 app.post("/upload", upload.single("product"), (req, res) => {
@@ -84,11 +35,13 @@ app.post("/upload", upload.single("product"), (req, res) => {
   }
 
   let imageUrl;
-  if (isCloudinaryConfigured) {
-    imageUrl = req.file.path;
+  if (isS3Configured) {
+    imageUrl = req.file.location;
+    console.log(`✅ File uploaded to S3: ${imageUrl}`);
   } else {
     const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get("host")}`;
     imageUrl = `${baseUrl}/images/${req.file.filename}`;
+    console.log(`✅ File uploaded locally: ${imageUrl}`);
   }
 
   res.json({
@@ -107,6 +60,7 @@ const reviewRoutes = require("./routes/reviews");
 const promoRoutes = require("./routes/promo");
 const wishlistRoutes = require("./routes/wishlist");
 const chatRoutes = require("./routes/chat");
+const s3ProductsRoutes = require("./routes/s3Products");
 
 app.use("/api/products", productRoutes);
 app.use("/api/auth", authRoutes);
@@ -117,6 +71,7 @@ app.use("/api/reviews", reviewRoutes);
 app.use("/api/promo", promoRoutes);
 app.use("/api/wishlist", wishlistRoutes);
 app.use("/api/chat", chatRoutes);
+app.use("/api/s3", s3ProductsRoutes);
 
 // Socket.io logic
 const Message = require("./models/Message");

@@ -4,7 +4,7 @@ const Product = require("../models/Product");
 const User = require("../models/User");
 const Order = require("../models/Order");
 const fetchUser = require("../middleware/auth");
-const upload = require("../middleware/cloudinary"); // Import your new middleware
+const { upload, isS3Configured } = require("../middleware/upload");
 const fs = require("fs");
 const path = require("path");
 const { createThumbnailUrl, generateLocalThumbnail } = require("../utils/imageUtils");
@@ -49,8 +49,8 @@ router.post("/products/add", fetchUser, verifyAdmin, upload.single('imageFile'),
     // If a file was uploaded, use the correctly built path.
     let originalImageUrl;
     if (req.file) {
-      if (isCloudinaryConfigured) {
-        originalImageUrl = req.file.path;
+      if (isS3Configured) {
+        originalImageUrl = req.file.location;
       } else {
         const port = process.env.PORT || 4000;
         const baseUrl = process.env.BASE_URL || `http://localhost:${port}`;
@@ -93,8 +93,8 @@ router.post("/products/add", fetchUser, verifyAdmin, upload.single('imageFile'),
       old_price,
     });
 
-    // Generate local thumbnail file if not on Cloudinary (await as it's now async)
-    if (!isCloudinaryConfigured) {
+    // Generate local thumbnail file if not on S3 (await as it's now async)
+    if (!isS3Configured) {
       await generateLocalThumbnail(newProduct.image);
       for (const url of (newProduct.sub_images || [])) {
         await generateLocalThumbnail(url);
@@ -147,8 +147,8 @@ router.put("/products/:id", fetchUser, verifyAdmin, upload.single('imageFile'), 
     // IMAGE UPDATE LOGIC
     if (req.file) {
       // New file uploaded: Create fresh URLs
-      if (isCloudinaryConfigured) {
-        product.image = req.file.path;
+      if (isS3Configured) {
+        product.image = req.file.location;
       } else {
         const port = process.env.PORT || 4000;
         const baseUrl = process.env.BASE_URL || `http://localhost:${port}`;
@@ -161,8 +161,8 @@ router.put("/products/:id", fetchUser, verifyAdmin, upload.single('imageFile'), 
       product.thumbnail = createThumbnailUrl(req.body.image);
     }
 
-    // Generate local thumbnail file if not on Cloudinary (await as it's now async)
-    if (!isCloudinaryConfigured) {
+    // Generate local thumbnail file if not on S3 (await as it's now async)
+    if (!isS3Configured) {
       await generateLocalThumbnail(product.image);
       for (const url of (product.sub_images || [])) {
         await generateLocalThumbnail(url);

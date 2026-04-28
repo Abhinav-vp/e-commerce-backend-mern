@@ -38,6 +38,10 @@ const productSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  description: {
+    type: String,
+    required: false,
+  },
 });
 
 module.exports = mongoose.model("Product", productSchema);
