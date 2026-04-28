@@ -18,6 +18,10 @@ const io = new Server(server, {
 });
 const port = process.env.PORT || 4000;
 
+// Log S3 Status
+const { isS3Configured: checkS3 } = require("./middleware/upload");
+console.log(`📡 S3 Configuration Status: ${checkS3 ? "ACTIVE" : "INACTIVE (Falling back to local storage)"}`);
+
 // Middleware
 app.use(express.json());
 app.use(cors());
