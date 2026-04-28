@@ -34,7 +34,13 @@ if (isS3Configured) {
   });
 } else {
   // Graceful fallback to disk storage if S3 is not configured
-  console.warn("⚠️ S3 not fully configured. Falling back to local storage.");
+  const missing = [];
+  if (!process.env.AWS_ACCESS_KEY_ID) missing.push("AWS_ACCESS_KEY_ID");
+  if (!process.env.AWS_SECRET_ACCESS_KEY) missing.push("AWS_SECRET_ACCESS_KEY");
+  if (!process.env.AWS_BUCKET_NAME) missing.push("AWS_BUCKET_NAME");
+  if (!process.env.AWS_REGION) missing.push("AWS_REGION");
+
+  console.warn(`⚠️ S3 not fully configured. Falling back to local storage. Missing: ${missing.join(", ")}`);
   storage = multer.diskStorage({
     destination: function (req, file, cb) {
       cb(null, path.join(__dirname, '..', 'upload', 'images'));

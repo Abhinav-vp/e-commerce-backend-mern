@@ -46,7 +46,14 @@ if (isS3Configured) {
     contentType: multerS3.AUTO_CONTENT_TYPE, // Automatically set content type
   });
 } else {
+  const missing = [];
+  if (!process.env.AWS_ACCESS_KEY_ID) missing.push("AWS_ACCESS_KEY_ID");
+  if (!process.env.AWS_SECRET_ACCESS_KEY) missing.push("AWS_SECRET_ACCESS_KEY");
+  if (!process.env.AWS_BUCKET_NAME) missing.push("AWS_BUCKET_NAME");
+  if (!process.env.AWS_REGION) missing.push("AWS_REGION");
+  
   console.log("Using Local Disk Storage for file storage");
+  console.log(`⚠️ S3 not fully configured. Missing: ${missing.join(", ")}`);
   // Use local disk storage as fallback
   storage = multer.diskStorage({
     destination: uploadDir,
