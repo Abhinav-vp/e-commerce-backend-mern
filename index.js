@@ -497,13 +497,33 @@ async function seedDatabase() {
   }
   console.log(`📁 Copied ${copied} product images`);
 
-  const docs = products.map((p) => ({
-    ...p,
-    image: `${BASE_URL}/images/${p.image}`,
-    thumbnail: `${BASE_URL}/thumbnails/thumb_${p.image.replace(/\.(png|jpg|jpeg|webp)$/, ".jpg")}`,
-  }));
-  await Product.insertMany(docs);
-  console.log(`🌱 Seeded ${docs.length} products into database`);
+  const docs = [];
+  for (const p of products) {
+    const src = path.join(FRONTEND_ASSETS, p.image);
+    if (fs.existsSync(src)) {
+      const buffer = fs.readFileSync(src);
+      console.log(`🛠️ Optimizing seed image: ${p.image}...`);
+      
+      const [imageUrl, thumbnailUrl] = await Promise.all([
+        processAndUpload(buffer, p.image, 'main'),
+        processAndUpload(buffer, p.image, 'thumbnail')
+      ]);
+
+      docs.push({
+        ...p,
+        image: imageUrl,
+        thumbnail: thumbnailUrl,
+      });
+    }
+  }
+
+  if (docs.length > 0) {
+    await Product.insertMany(docs);
+    console.log(`🌱 Seeded ${docs.length} optimized products into database`);
+  }
+  
+  // This will optimize all default images on the FIRST run. 
+  // To see the changes on Render, you may need to delete your existing products in MongoDB so the seed runs again, or simply upload a new product.
 }
 
 // ---------- Connect to MongoDB and start ----------
