@@ -72,15 +72,21 @@ const generateLocalThumbnail = async (imageUrl) => {
 const processAndUpload = async (buffer, originalName, type = 'main') => {
   const isS3 = process.env.USE_S3 === "true";
   const timestamp = Date.now();
-  const extension = ".jpg"; // Normalized to JPEG for better compression
-  const filename = `${type}_${timestamp}_${originalName.split('.')[0]}${extension}`;
+  const extension = ".webp"; // Switch to WebP for superior compression
+  
+  // Use professional subfolder structure as requested
+  const s3SubFolder = type === 'thumbnail' ? 'products/thumb' : 'products/original';
+  const localSubFolder = type === 'thumbnail' ? 'thumbnails' : 'images';
+  
+  const cleanName = originalName.split('.')[0].replace(/[^a-z0-9]/gi, '_').toLowerCase();
+  const filename = `${timestamp}_${cleanName}${extension}`;
 
   const sharpInstance = sharp(buffer);
   
   if (type === 'thumbnail') {
-    sharpInstance.resize(300, 300, { fit: 'cover' }).jpeg({ quality: 60 });
+    sharpInstance.resize(300, 300, { fit: 'cover' }).webp({ quality: 60 });
   } else {
-    sharpInstance.resize(1200, null, { withoutEnlargement: true }).jpeg({ quality: 80 });
+    sharpInstance.resize(1200, null, { withoutEnlargement: true }).webp({ quality: 80 });
   }
 
   const processedBuffer = await sharpInstance.toBuffer();
@@ -89,36 +95,31 @@ const processAndUpload = async (buffer, originalName, type = 'main') => {
     const s3 = new S3Client({
       region: process.env.AWS_REGION.trim().split(" ").pop(),
       credentials: {
-        accessKey_id: process.env.AWS_ACCESS_KEY_ID,
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
       },
     });
 
-    const key = `products/${filename}`;
+    const key = `${s3SubFolder}/${filename}`;
     await s3.send(new PutObjectCommand({
       Bucket: process.env.AWS_BUCKET_NAME,
       Key: key,
       Body: processedBuffer,
-      ContentType: "image/jpeg"
+      ContentType: "image/webp"
     }));
 
-    // Construct the public URL (assumes public bucket or policy)
-    // Using a more standard S3 URL format
+    // Standard S3 URL
     const url = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION.trim().split(" ").pop()}.amazonaws.com/${key}`;
     return url;
   } else {
     // Local storage fallback
-    const folder = type === 'thumbnail' ? 'thumbnails' : 'images';
-    const localDir = path.join(__dirname, "..", "upload", folder);
+    const localDir = path.join(__dirname, "..", "upload", localSubFolder);
     if (!require('fs').existsSync(localDir)) require('fs').mkdirSync(localDir, { recursive: true });
     
     const localPath = path.join(localDir, filename);
     await sharpInstance.toFile(localPath);
     
-    // Return relative path for the DB, or full local URL if you prefer
-    const protocol = process.env.PROTOCOL || 'http';
-    const host = process.env.HOST || 'localhost:7000';
-    return `/${folder}/${filename}`;
+    return `/${localSubFolder}/${filename}`;
   }
 };
 
