@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1037.0",
-    "bcrypt": "^5.1.1",
+    "bcryptjs": "^2.4.3",
     "cloudinary": "^1.41.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -23,8 +23,13 @@
     "multer-storage-cloudinary": "^4.0.0",
     "razorpay": "^2.9.6",
     "sharp": "^0.34.5",
-    "@img/sharp-linux-x64": "^0.33.5",
     "socket.io": "^4.8.3"
+  },
+  "optionalDependencies": {
+    "@img/sharp-libvips-linux-x64": "^1.0.5",
+    "@img/sharp-linux-x64": "^0.33.5",
+    "@img/sharp-libvips-linux-arm64": "^1.0.5",
+    "@img/sharp-linux-arm64": "^0.33.5"
   },
   "devDependencies": {
     "nodemon": "^3.1.4"
