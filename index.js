@@ -4,7 +4,8 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const fs = require("fs");
-const { upload, isS3Configured } = require("./middleware/upload");
+const { upload, memoryUpload, isS3Configured } = require("./middleware/upload");
+const { processAndUpload } = require("./utils/imageUtils");
 
 const app = express();
 const http = require("http");
@@ -19,8 +20,7 @@ const io = new Server(server, {
 const port = process.env.PORT || 4000;
 
 // Log S3 Status
-const { isS3Configured: checkS3 } = require("./middleware/upload");
-console.log(`📡 S3 Configuration Status: ${checkS3 ? "ACTIVE" : "INACTIVE (Falling back to local storage)"}`);
+console.log(`📡 S3 Configuration Status: ${isS3Configured ? "ACTIVE" : "INACTIVE (Falling back to local storage)"}`);
 
 // Middleware
 app.use(express.json());
