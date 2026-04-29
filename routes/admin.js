@@ -77,16 +77,18 @@ router.post("/products/add", fetchUser, verifyAdmin, upload.single('imageFile'),
       return res.status(400).json({ success: false, error: "New Price cannot be higher than Old Price" });
     }
 
-    // Generate the thumbnail URL using our helper function
-    const thumbnailUrl = createThumbnailUrl(originalImageUrl);
-    const subThumbnails = (sub_images || []).map(url => createThumbnailUrl(url));
+    // Generate the thumbnail URL using our helper function (fallback if not provided by body)
+    const thumbnailUrl = req.body.thumbnail || createThumbnailUrl(originalImageUrl);
+    const subThumbnails = (req.body.sub_thumbnails && req.body.sub_thumbnails.length > 0) 
+      ? req.body.sub_thumbnails 
+      : (sub_images || []).map(url => createThumbnailUrl(url));
 
     const newProduct = new Product({
       id,
       name,
       category,
-      image: originalImageUrl, // Saves high quality (e.g. 2MB)
-      thumbnail: thumbnailUrl, // Saves low quality (e.g. 15KB)
+      image: originalImageUrl, // Saves high quality (e.g. 1.2M optimized)
+      thumbnail: thumbnailUrl, // Saves low quality (e.g. 30KB sharp compressed)
       sub_images: sub_images || [],
       sub_thumbnails: subThumbnails,
       new_price,
@@ -146,7 +148,7 @@ router.put("/products/:id", fetchUser, verifyAdmin, upload.single('imageFile'), 
 
     // IMAGE UPDATE LOGIC
     if (req.file) {
-      // New file uploaded: Create fresh URLs
+      // New file uploaded directly to this endpoint: Create fresh URLs
       if (isS3Configured) {
         product.image = req.file.location;
       } else {
@@ -155,10 +157,11 @@ router.put("/products/:id", fetchUser, verifyAdmin, upload.single('imageFile'), 
         product.image = `${baseUrl}/images/${req.file.filename}`;
       }
       product.thumbnail = createThumbnailUrl(product.image);
-    } else if (req.body.image && !req.body.image.includes('w_300,q_60')) {
-      // If a new URL is provided as a string and isn't already a thumbnail
+    } else if (req.body.image) {
+      // Handle the case where AdminProducts.jsx sends pre-processed URLs
       product.image = req.body.image;
-      product.thumbnail = createThumbnailUrl(req.body.image);
+      product.thumbnail = req.body.thumbnail || createThumbnailUrl(req.body.image);
+      if (req.body.sub_thumbnails) product.sub_thumbnails = req.body.sub_thumbnails;
     }
 
     // Generate local thumbnail file if not on S3 (await as it's now async)

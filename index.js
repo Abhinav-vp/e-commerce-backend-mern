@@ -32,44 +32,36 @@ const thumbnailDir = path.join(__dirname, "upload", "thumbnails");
 app.use("/images", express.static(uploadDir));
 app.use("/thumbnails", express.static(thumbnailDir));
 
-// Image upload endpoint
-app.post("/upload", (req, res, next) => {
-  upload.single("product")(req, res, (err) => {
-    if (err) {
-      console.error("❌ Multer/S3 Upload Error:", err);
-      return res.status(500).json({ 
-        success: false, 
-        message: err.message || "File upload failed",
-        error: err.code || "UPLOAD_ERROR"
-      });
-    }
-
+// Updated Optimized Image upload endpoint
+app.post("/upload", memoryUpload.single("product"), async (req, res) => {
+  try {
     if (!req.file) {
       return res.status(400).json({ success: false, message: "No file uploaded" });
     }
 
-    let imageUrl;
-    if (isS3Configured) {
-      // Force HTTPS for S3 URLs if they start with http:
-      imageUrl = req.file.location ? req.file.location.replace("http://", "https://") : null;
-      
-      if (!imageUrl) {
-         return res.status(500).json({ success: false, message: "S3 upload failed: No location returned" });
-      }
-      
-      console.log(`✅ File uploaded to S3: ${imageUrl}`);
-    } else {
-      const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-      const baseUrl = process.env.BASE_URL || `${protocol}://${req.get("host")}`;
-      imageUrl = `${baseUrl}/images/${req.file.filename}`;
-      console.log(`✅ File uploaded locally: ${imageUrl}`);
-    }
+    console.log(`⚡ Processing image: ${req.file.originalname}`);
+
+    // Process and upload both main image and thumbnail in parallel
+    const [imageUrl, thumbnailUrl] = await Promise.all([
+      processAndUpload(req.file.buffer, req.file.originalname, 'main'),
+      processAndUpload(req.file.buffer, req.file.originalname, 'thumbnail')
+    ]);
+
+    console.log(`✅ Upload Complete. Main: ${imageUrl}`);
 
     res.json({
       success: true,
       image_url: imageUrl,
+      thumbnail_url: thumbnailUrl
     });
-  });
+  } catch (error) {
+    console.error("❌ Upload Error:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Image processing failed",
+      error: error.message 
+    });
+  }
 });
 
 // Routes

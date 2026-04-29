@@ -16,9 +16,10 @@ if (!fs.existsSync(uploadDir)) {
 const isS3Configured = process.env.USE_S3 === "true";
 
 let storage;
+const memoryStorage = multer.memoryStorage(); // For Sharp processing
 
 if (isS3Configured) {
-  console.log("✅ AWS S3 configuration detected");
+  console.log("✅ AWS S3 detected. Using S3 for final storage.");
   const region = process.env.AWS_REGION.trim().split(" ").pop();
   
   const s3 = new S3Client({
@@ -33,7 +34,6 @@ if (isS3Configured) {
     s3: s3,
     bucket: process.env.AWS_BUCKET_NAME,
     metadata: (req, file, cb) => {
-      console.log(`📡 S3 Upload starting for file: ${file.originalname}`);
       cb(null, { fieldName: file.fieldname });
     },
     key: (req, file, cb) => {
@@ -43,7 +43,7 @@ if (isS3Configured) {
     contentType: multerS3.AUTO_CONTENT_TYPE,
   });
 } else {
-  console.log("⚠️ S3 not fully configured. Using Local Disk Storage.");
+  console.log("⚠️ S3 not enabled. Using Local Disk Storage.");
   storage = multer.diskStorage({
     destination: uploadDir,
     filename: (req, file, cb) => {
@@ -64,7 +64,14 @@ const upload = multer({
   }
 });
 
+// Create a separate multer instance for memory uploads (for sharp processing)
+const memoryUpload = multer({ 
+  storage: memoryStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }
+});
+
 module.exports = {
   upload,
+  memoryUpload,
   isS3Configured
 };
