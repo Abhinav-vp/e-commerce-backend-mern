@@ -12,19 +12,17 @@ if (!fs.existsSync(uploadDir)) {
 }
 
 // Configuration checks
-const isS3Configured = 
-  process.env.AWS_ACCESS_KEY_ID && 
-  process.env.AWS_SECRET_ACCESS_KEY && 
-  process.env.AWS_BUCKET_NAME &&
-  process.env.AWS_REGION &&
-  process.env.AWS_ACCESS_KEY_ID !== "your_access_key";
+// S3 is only active if USE_S3 is explicitly set to "true"
+const isS3Configured = process.env.USE_S3 === "true";
 
 let storage;
 
 if (isS3Configured) {
-  console.log("Using AWS S3 for file storage");
+  console.log("✅ AWS S3 configuration detected");
+  const region = process.env.AWS_REGION.trim().split(" ").pop();
+  
   const s3 = new S3Client({
-    region: process.env.AWS_REGION ? (process.env.AWS_REGION.includes(" ") ? process.env.AWS_REGION.split(" ").pop() : process.env.AWS_REGION) : "ap-south-1", 
+    region: region,
     credentials: {
       accessKeyId: process.env.AWS_ACCESS_KEY_ID,
       secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
@@ -40,21 +38,12 @@ if (isS3Configured) {
     },
     key: (req, file, cb) => {
       const filename = `products/${Date.now().toString()}-${file.originalname}`;
-      console.log(`🔑 S3 Key generated: ${filename}`);
       cb(null, filename);
     },
-    contentType: multerS3.AUTO_CONTENT_TYPE, // Automatically set content type
+    contentType: multerS3.AUTO_CONTENT_TYPE,
   });
 } else {
-  const missing = [];
-  if (!process.env.AWS_ACCESS_KEY_ID) missing.push("AWS_ACCESS_KEY_ID");
-  if (!process.env.AWS_SECRET_ACCESS_KEY) missing.push("AWS_SECRET_ACCESS_KEY");
-  if (!process.env.AWS_BUCKET_NAME) missing.push("AWS_BUCKET_NAME");
-  if (!process.env.AWS_REGION) missing.push("AWS_REGION");
-  
-  console.log("Using Local Disk Storage for file storage");
-  console.log(`⚠️ S3 not fully configured. Missing: ${missing.join(", ")}`);
-  // Use local disk storage as fallback
+  console.log("⚠️ S3 not fully configured. Using Local Disk Storage.");
   storage = multer.diskStorage({
     destination: uploadDir,
     filename: (req, file, cb) => {

@@ -33,24 +33,42 @@ app.use("/images", express.static(uploadDir));
 app.use("/thumbnails", express.static(thumbnailDir));
 
 // Image upload endpoint
-app.post("/upload", upload.single("product"), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ success: false, message: "No file uploaded" });
-  }
+app.post("/upload", (req, res, next) => {
+  upload.single("product")(req, res, (err) => {
+    if (err) {
+      console.error("❌ Multer/S3 Upload Error:", err);
+      return res.status(500).json({ 
+        success: false, 
+        message: err.message || "File upload failed",
+        error: err.code || "UPLOAD_ERROR"
+      });
+    }
 
-  let imageUrl;
-  if (isS3Configured) {
-    imageUrl = req.file.location;
-    console.log(`✅ File uploaded to S3: ${imageUrl}`);
-  } else {
-    const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get("host")}`;
-    imageUrl = `${baseUrl}/images/${req.file.filename}`;
-    console.log(`✅ File uploaded locally: ${imageUrl}`);
-  }
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "No file uploaded" });
+    }
 
-  res.json({
-    success: true,
-    image_url: imageUrl,
+    let imageUrl;
+    if (isS3Configured) {
+      // Force HTTPS for S3 URLs if they start with http:
+      imageUrl = req.file.location ? req.file.location.replace("http://", "https://") : null;
+      
+      if (!imageUrl) {
+         return res.status(500).json({ success: false, message: "S3 upload failed: No location returned" });
+      }
+      
+      console.log(`✅ File uploaded to S3: ${imageUrl}`);
+    } else {
+      const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+      const baseUrl = process.env.BASE_URL || `${protocol}://${req.get("host")}`;
+      imageUrl = `${baseUrl}/images/${req.file.filename}`;
+      console.log(`✅ File uploaded locally: ${imageUrl}`);
+    }
+
+    res.json({
+      success: true,
+      image_url: imageUrl,
+    });
   });
 });
 
