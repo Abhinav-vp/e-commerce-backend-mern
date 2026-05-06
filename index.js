@@ -5,7 +5,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const fs = require("fs");
 const { upload, memoryUpload, isS3Configured } = require("./middleware/upload");
-const { processAndUpload } = require("./utils/imageUtils");
+const { processAndUpload, configureBucketAccess } = require("./utils/imageUtils");
 
 const app = express();
 const http = require("http");
@@ -545,6 +545,9 @@ async function startServer() {
     await mongoose.connect(mongoUri);
     console.log("✅ Connected to in-memory MongoDB");
   }
+
+  // Configure S3 bucket for public access (if S3 is enabled)
+  await configureBucketAccess();
 
   // Auto-seed if database is empty
   await seedDatabase();

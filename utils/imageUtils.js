@@ -1,6 +1,6 @@
 const path = require("path");
 const sharp = require("sharp");
-const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+const { S3Client, PutObjectCommand, PutPublicAccessBlockCommand, PutBucketPolicyCommand } = require("@aws-sdk/client-s3");
 
 /**
  * Maps an image URL to its corresponding thumbnail URL.
@@ -113,13 +113,66 @@ const processAndUpload = async (buffer, originalName, type = 'main') => {
     return url;
   } else {
     // Local storage fallback
+    const fs = require('fs');
     const localDir = path.join(__dirname, "..", "upload", localSubFolder);
-    if (!require('fs').existsSync(localDir)) require('fs').mkdirSync(localDir, { recursive: true });
+    if (!fs.existsSync(localDir)) fs.mkdirSync(localDir, { recursive: true });
     
     const localPath = path.join(localDir, filename);
-    await sharpInstance.toFile(localPath);
+    fs.writeFileSync(localPath, processedBuffer);
     
     return `/${localSubFolder}/${filename}`;
+  }
+};
+
+/**
+ * Configures the S3 bucket for public read access.
+ * Disables Block Public Access and sets a bucket policy.
+ * Call once at server startup.
+ */
+const configureBucketAccess = async () => {
+  if (process.env.USE_S3 !== "true") return;
+
+  const bucket = process.env.AWS_BUCKET_NAME;
+  const s3 = new S3Client({
+    region: process.env.AWS_REGION.trim().split(" ").pop(),
+    credentials: {
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    },
+  });
+
+  try {
+    // Step 1: Disable Block Public Access
+    await s3.send(new PutPublicAccessBlockCommand({
+      Bucket: bucket,
+      PublicAccessBlockConfiguration: {
+        BlockPublicAcls: false,
+        IgnorePublicAcls: false,
+        BlockPublicPolicy: false,
+        RestrictPublicBuckets: false,
+      },
+    }));
+    console.log("✅ S3 Block Public Access disabled");
+
+    // Step 2: Set bucket policy for public read
+    const policy = {
+      Version: "2012-10-17",
+      Statement: [{
+        Sid: "PublicReadGetObject",
+        Effect: "Allow",
+        Principal: "*",
+        Action: "s3:GetObject",
+        Resource: `arn:aws:s3:::${bucket}/*`,
+      }],
+    };
+    await s3.send(new PutBucketPolicyCommand({
+      Bucket: bucket,
+      Policy: JSON.stringify(policy),
+    }));
+    console.log("✅ S3 bucket policy set for public read access");
+  } catch (err) {
+    console.warn(`⚠️ Could not configure S3 bucket access: ${err.message}`);
+    console.warn("   Images may not be accessible. Check AWS permissions.");
   }
 };
 
@@ -127,4 +180,5 @@ module.exports = {
   createThumbnailUrl,
   generateLocalThumbnail,
   processAndUpload,
+  configureBucketAccess,
 };
