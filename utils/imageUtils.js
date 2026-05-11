@@ -1,4 +1,5 @@
 const path = require("path");
+const fs = require("fs");
 const sharp = require("sharp");
 const { S3Client, PutObjectCommand, PutPublicAccessBlockCommand, PutBucketPolicyCommand } = require("@aws-sdk/client-s3");
 
@@ -13,8 +14,8 @@ const createThumbnailUrl = (url) => {
   if (url.includes('res.cloudinary.com')) {
     const parts = url.split('/upload/');
     if (parts.length === 2) {
-      // Use w_300, q_auto, f_auto for optimized thumbnails
-      return `${parts[0]}/upload/w_300,q_auto,f_auto/${parts[1]}`;
+      // Use w_200, q_auto, f_auto for faster optimized thumbnails
+      return `${parts[0]}/upload/w_200,q_auto,f_auto/${parts[1]}`;
     }
   }
 
@@ -50,13 +51,13 @@ const generateLocalThumbnail = async (imageUrl) => {
     }
 
     if (fs.existsSync(originalPath)) {
-      // Use sharp to resize and compress
+      // Use sharp to resize and compress for speed (150x150, 50% quality)
       await sharp(originalPath)
-        .resize(200, 200, {
+        .resize(150, 150, {
           fit: 'cover',
           position: 'center'
         })
-        .jpeg({ quality: 60 }) // Reduce quality to 60%
+        .jpeg({ quality: 50, progressive: true }) // Lower quality for speed
         .toFile(thumbnailPath);
 
       console.log(`✅ Compressed thumbnail generated: ${thumbnailPath}`);
@@ -84,9 +85,11 @@ const processAndUpload = async (buffer, originalName, type = 'main') => {
   const sharpInstance = sharp(buffer);
   
   if (type === 'thumbnail') {
-    sharpInstance.resize(300, 300, { fit: 'cover' }).webp({ quality: 60 });
+    // 200x200 at 50% quality for fast rendering
+    sharpInstance.resize(200, 200, { fit: 'cover' }).webp({ quality: 50, effort: 4 });
   } else {
-    sharpInstance.resize(1200, null, { withoutEnlargement: true }).webp({ quality: 80 });
+    // 1200 width at 75% quality for original
+    sharpInstance.resize(1200, null, { withoutEnlargement: true }).webp({ quality: 75, effort: 4 });
   }
 
   const processedBuffer = await sharpInstance.toBuffer();
@@ -113,7 +116,6 @@ const processAndUpload = async (buffer, originalName, type = 'main') => {
     return url;
   } else {
     // Local storage fallback
-    const fs = require('fs');
     const localDir = path.join(__dirname, "..", "upload", localSubFolder);
     if (!fs.existsSync(localDir)) fs.mkdirSync(localDir, { recursive: true });
     

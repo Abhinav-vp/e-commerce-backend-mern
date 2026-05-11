@@ -1,28 +1,49 @@
-# Use Node 20 Bullseye-slim for better compatibility with native modules like sharp
-FROM node:20-bullseye-slim AS base
+# Stage 1: Build stage
+FROM node:20-bullseye AS builder
 
-# Set working directory
-WORKDIR /app
-
-# Install system dependencies if needed (e.g., for node-gyp or specific sharp requirements)
+# Install build dependencies and libvips-dev for Sharp
 RUN apt-get update && apt-get install -y \
     python3 \
     make \
     g++ \
+    libvips-dev \
     && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-# Using --omit=dev for production-like environment if needed, 
-# but for now we install all to be safe.
+# Install dependencies including devDependencies for rebuilding
 RUN npm install
 
-# Copy the rest of the application code
+# Rebuild sharp for the current architecture
+RUN npm rebuild sharp
+
+# Stage 2: Runtime stage
+FROM node:20-bullseye-slim AS runner
+
+# Install runtime dependencies for Sharp if needed
+# bullseye-slim includes minimal shared libs.
+RUN apt-get update && apt-get install -y \
+    libvips \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Set production environment
+ENV NODE_ENV=production
+
+# Copy only the necessary files from builder
+COPY --from=builder /app/node_modules ./node_modules
 COPY . .
 
-# Expose the port from .env (usually 7000 in this project)
+# Ensure upload directories exist with correct permissions
+# This fixes the rendering/upload issue by pre-creating paths
+RUN mkdir -p upload/images upload/thumbnails && chmod -R 777 upload
+
+# Expose the application port (matching .env)
 EXPOSE 7000
 
 # Start the application
