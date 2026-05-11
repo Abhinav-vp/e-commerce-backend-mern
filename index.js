@@ -168,7 +168,7 @@ async function seedDatabase() {
     "Assets",
     "Frontend_Assets",
   );
-  const BASE_URL = process.env.BASE_URL || `http://localhost:${port}`;
+  const base_url = process.env.BASE_URL || `http://localhost:${port}`;
 
   const products = [
     {

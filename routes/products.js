@@ -57,8 +57,7 @@ router.post("/add", upload.single('imageFile'), async (req, res) => {
       if (isS3Configured) {
         originalImageUrl = req.file.location;
       } else {
-        const port = process.env.PORT || 4000;
-        const baseUrl = process.env.BASE_URL || `http://localhost:${port}`;
+        const baseUrl = process.env.BASE_URL || "http://localhost:7000";
         originalImageUrl = `${baseUrl}/images/${req.file.filename}`;
       }
     } else {
