@@ -122,7 +122,7 @@ const processAndUpload = async (buffer, originalName, type = 'main') => {
     const localPath = path.join(localDir, filename);
     fs.writeFileSync(localPath, processedBuffer);
     
-    const baseUrl = process.env.BASE_URL || "http://localhost:7000";
+    const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 7000}`;
     return `${baseUrl}/${localSubFolder}/${filename}`;
   }
 };

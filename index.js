@@ -553,7 +553,8 @@ async function startServer() {
   await seedDatabase();
 
   server.listen(port, () => {
-    console.log(`🚀 Server running on http://localhost:${port}`);
+    const baseUrl = process.env.BASE_URL || `http://localhost:${port}`;
+    console.log(`🚀 Server running on ${baseUrl}`);
   });
 }
 

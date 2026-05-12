@@ -52,7 +52,7 @@ router.post("/products/add", fetchUser, verifyAdmin, upload.single('imageFile'),
       if (isS3Configured) {
         originalImageUrl = req.file.location;
       } else {
-        const baseUrl = process.env.BASE_URL || "http://localhost:7000";
+        const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 7000}`;
         originalImageUrl = `${baseUrl}/images/${req.file.filename}`;
       }
     } else {
@@ -151,7 +151,7 @@ router.put("/products/:id", fetchUser, verifyAdmin, upload.single('imageFile'), 
       if (isS3Configured) {
         product.image = req.file.location;
       } else {
-        const baseUrl = process.env.BASE_URL || "http://localhost:7000";
+        const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 7000}`;
         product.image = `${baseUrl}/images/${req.file.filename}`;
       }
       product.thumbnail = createThumbnailUrl(product.image);

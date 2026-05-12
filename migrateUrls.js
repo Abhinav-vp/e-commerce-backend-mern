@@ -12,32 +12,55 @@ async function migrate() {
         console.log(`🔍 Found ${products.length} products to check.`);
 
         let updatedCount = 0;
-        const OLD_URL = "http://localhost:7000";
-        const NEW_URL = process.env.BASE_URL || "https://your-production-url.onrender.com";
+        const OLD_URLS = ["http://localhost:7000", "http://localhost:4000"];
+        const NEW_URL = process.env.BASE_URL;
+
+        if (!NEW_URL || NEW_URL.includes("your-production-url")) {
+            console.error("❌ Error: BASE_URL is not set or still has the placeholder value in .env.");
+            process.exit(1);
+        }
+
+        console.log(`🚀 Migrating from ${OLD_URLS.join(", ")} to ${NEW_URL}...`);
 
         for (const product of products) {
             let changed = false;
 
-            if (product.image && product.image.startsWith(OLD_URL)) {
-                product.image = product.image.replace(OLD_URL, NEW_URL);
+            const updateUrl = (url) => {
+                if (!url) return url;
+                for (const old of OLD_URLS) {
+                    if (url.startsWith(old)) return url.replace(old, NEW_URL);
+                }
+                return url;
+            };
+
+            const oldImage = product.image;
+            product.image = updateUrl(product.image);
+            if (oldImage !== product.image) {
                 changed = true;
+                console.log(`🖼️ Updated image for Product ${product.id}`);
             }
 
-            if (product.thumbnail && product.thumbnail.startsWith(OLD_URL)) {
-                product.thumbnail = product.thumbnail.replace(OLD_URL, NEW_URL);
+            const oldThumb = product.thumbnail;
+            product.thumbnail = updateUrl(product.thumbnail);
+            if (oldThumb !== product.thumbnail) {
                 changed = true;
+                console.log(`📏 Updated thumbnail for Product ${product.id}`);
             }
 
             // Also check sub_images
             if (product.sub_images && product.sub_images.length > 0) {
-                product.sub_images = product.sub_images.map(url => url.startsWith(OLD_URL) ? url.replace(OLD_URL, NEW_URL) : url);
+                const originalSub = JSON.stringify(product.sub_images);
+                product.sub_images = product.sub_images.map(url => updateUrl(url));
+                if (originalSub !== JSON.stringify(product.sub_images)) changed = true;
             }
 
             if (product.sub_thumbnails && product.sub_thumbnails.length > 0) {
-                product.sub_thumbnails = product.sub_thumbnails.map(url => url.startsWith(OLD_URL) ? url.replace(OLD_URL, NEW_URL) : url);
+                const originalSubThumb = JSON.stringify(product.sub_thumbnails);
+                product.sub_thumbnails = product.sub_thumbnails.map(url => updateUrl(url));
+                if (originalSubThumb !== JSON.stringify(product.sub_thumbnails)) changed = true;
             }
 
-            if (changed || (product.sub_images && product.sub_images.some(u => u.includes(OLD_URL)))) {
+            if (changed) {
                 await product.save();
                 updatedCount++;
             }

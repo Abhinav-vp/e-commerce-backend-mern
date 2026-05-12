@@ -10,6 +10,7 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "seed": "node seed.js",
+    "migrate": "node migrateUrls.js",
     "postinstall": "npm rebuild sharp"
   },
   "dependencies": {
