@@ -89,6 +89,7 @@ app.use("/api/s3", s3ProductsRoutes);
 
 // Socket.io logic
 const Message = require("./models/Message");
+const { getAIResponse } = require("./utils/aiAssistant");
 
 io.on("connection", (socket) => {
   console.log("A user connected:", socket.id);
@@ -109,7 +110,7 @@ io.on("connection", (socket) => {
       
       const newMessage = new Message({
         senderId,
-        receiverId,
+        receiverId: isAdmin ? receiverId : "ai_assistant", // If user sends, receiver is AI
         senderName,
         message,
         isAdmin
@@ -117,19 +118,50 @@ io.on("connection", (socket) => {
       
       await newMessage.save();
 
-      // If it's from user, send to admins
+      // Also send back to sender for instant update
+      socket.emit("messageSent", newMessage);
+
+      // If it's from user, trigger AI
       if (!isAdmin) {
+        // Emit typing status
+        socket.emit("aiTyping", true);
+
+        // Fetch last 10 messages for context
+        const history = await Message.find({
+          $or: [
+            { senderId: senderId },
+            { receiverId: senderId }
+          ]
+        }).sort({ timestamp: 1 }).limit(10);
+
+        // Get AI Response
+        const aiText = await getAIResponse(message, history);
+
+        const aiMessage = new Message({
+          senderId: "ai_assistant",
+          receiverId: senderId,
+          senderName: "AI Assistant",
+          message: aiText,
+          isAdmin: true
+        });
+
+        await aiMessage.save();
+        
+        // Stop typing and send message
+        socket.emit("aiTyping", false);
+        socket.emit("receiveMessage", aiMessage);
+        
+        // Also notify admins if they are listening (optional, but good for monitoring)
         io.to("admins").emit("receiveMessage", newMessage);
+        io.to("admins").emit("receiveMessage", aiMessage);
       } else {
-        // If it's from admin, send to specific user
+        // If it's from admin, send to specific user (manual intervention)
         io.to(receiverId).emit("receiveMessage", newMessage);
       }
       
-      // Also send back to sender for instant update (though client can also do it)
-      socket.emit("messageSent", newMessage);
-      
     } catch (error) {
       console.error("Socket error:", error);
+      socket.emit("aiTyping", false);
     }
   });
 

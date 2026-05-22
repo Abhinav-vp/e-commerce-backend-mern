@@ -15,6 +15,9 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1037.0",
+    "@google/generative-ai": "^0.24.1",
+    "@img/sharp-libvips-linux-x64": "1.0.4",
+    "@img/sharp-linux-x64": "0.33.5",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^1.41.3",
     "cors": "^2.8.5",
@@ -28,8 +31,6 @@
     "multer-storage-cloudinary": "^4.0.0",
     "razorpay": "^2.9.6",
     "sharp": "0.33.5",
-    "@img/sharp-libvips-linux-x64": "1.0.4",
-    "@img/sharp-linux-x64": "0.33.5",
     "socket.io": "^4.8.3"
   },
   "devDependencies": {
